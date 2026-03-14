@@ -45,7 +45,7 @@ async function githubApi(env: Env, method: string, endpoint: string, body?: Reco
     headers: {
       Authorization: `Bearer ${env.GITHUB_PAT}`,
       Accept: "application/vnd.github+json",
-      "User-Agent": "sundries-worker",
+      "User-Agent": "tl-worker",
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -76,7 +76,7 @@ async function downloadPhoto(env: Env, message: any, slug: string): Promise<{ ur
   const imageRes = await fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_TOKEN}/${filePath}`);
   const imageBytes = await imageRes.arrayBuffer();
 
-  const r2Key = `sundries/${slug}.jpg`;
+  const r2Key = `tl/${slug}.jpg`;
   await env.BUCKET.put(r2Key, imageBytes, {
     httpMetadata: { contentType: "image/jpeg" },
   });
@@ -89,7 +89,7 @@ async function downloadPhoto(env: Env, message: any, slug: string): Promise<{ ur
 }
 
 async function getFileSha(env: Env, slug: string): Promise<string> {
-  const path = `/contents/src/content/sundries/${slug}.md`;
+  const path = `/contents/src/content/timeline/${slug}.md`;
   const res = await githubApi(env, "GET", path + "?ref=main");
   if (!res.ok) throw new Error(`GitHub GET error: ${res.status}`);
   const data = await res.json() as any;
@@ -105,9 +105,9 @@ async function handleCreate(env: Env, ctx: ExecutionContext, message: any): Prom
   const image = await downloadPhoto(env, message, slug);
 
   const markdown = buildMarkdown(date, slug, text, image);
-  const path = `/contents/src/content/sundries/${slug}.md`;
+  const path = `/contents/src/content/timeline/${slug}.md`;
   const commitRes = await githubApi(env, "PUT", path, {
-    message: `Add sundries post ${slug}`,
+    message: `Add timeline post ${slug}`,
     content: btoa(unescape(encodeURIComponent(markdown))),
     branch: "main",
   });
@@ -132,16 +132,16 @@ async function handleEdit(env: Env, ctx: ExecutionContext, message: any): Promis
   const image = await downloadPhoto(env, message, slug);
 
   // Extract original date from existing file to preserve it
-  const fileRes = await githubApi(env, "GET", `/contents/src/content/sundries/${slug}.md?ref=main`);
+  const fileRes = await githubApi(env, "GET", `/contents/src/content/timeline/${slug}.md?ref=main`);
   const fileData = await fileRes.json() as any;
   const existingContent = decodeURIComponent(escape(atob(fileData.content.replace(/\n/g, ""))));
   const dateMatch = existingContent.match(/^date:\s*(.+)$/m);
   const date = dateMatch ? dateMatch[1] : new Date().toISOString();
 
   const markdown = buildMarkdown(date, slug, text, image);
-  const path = `/contents/src/content/sundries/${slug}.md`;
+  const path = `/contents/src/content/timeline/${slug}.md`;
   const commitRes = await githubApi(env, "PUT", path, {
-    message: `Update sundries post ${slug}`,
+    message: `Update timeline post ${slug}`,
     content: btoa(unescape(encodeURIComponent(markdown))),
     sha,
     branch: "main",
@@ -166,9 +166,9 @@ async function handleDelete(env: Env, ctx: ExecutionContext, message: any): Prom
   }
 
   const sha = await getFileSha(env, slug);
-  const path = `/contents/src/content/sundries/${slug}.md`;
+  const path = `/contents/src/content/timeline/${slug}.md`;
   const deleteRes = await githubApi(env, "DELETE", path, {
-    message: `Delete sundries post ${slug}`,
+    message: `Delete timeline post ${slug}`,
     sha,
     branch: "main",
   });
@@ -178,7 +178,7 @@ async function handleDelete(env: Env, ctx: ExecutionContext, message: any): Prom
     throw new Error(`GitHub API error: ${deleteRes.status} ${err}`);
   }
 
-  await env.BUCKET.delete(`sundries/${slug}.jpg`);
+  await env.BUCKET.delete(`tl/${slug}.jpg`);
   await env.KV.delete(`msg:${originalMessageId}`);
 
   await sendEphemeral(env, ctx, chatId, `Deleted (${slug})!`);

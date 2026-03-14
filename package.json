@@ -1,5 +1,5 @@
 {
-  "name": "sundries-worker",
+  "name": "tl-worker",
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
